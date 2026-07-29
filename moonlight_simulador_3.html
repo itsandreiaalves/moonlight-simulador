@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOONLIGHT — Simulador de Orçamento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0e1020;
+    --bg-2: #14172a;
+    --surface: #191d33;
+    --surface-2: #20243d;
+    --border: #2b3050;
+    --border-soft: #262a47;
+    --text: #ece9e2;
+    --text-dim: #9a9dbb;
+    --text-faint: #6c6f92;
+    --gold: #d8c48c;
+    --gold-soft: #7d7250;
+    --lavender: #b0a6ec;
+    --lavender-soft: #4a4372;
+    --danger: #e08a8a;
+    --radius: 14px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: radial-gradient(ellipse 120% 80% at 20% -10%, #1c2040 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height:100vh;
+    padding: 40px 24px 80px;
+  }
+  .wrap{ max-width: 1240px; margin: 0 auto; }
+
+  /* ---------- Header ---------- */
+  header{ margin-bottom: 36px; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--gold);
+    display:flex; align-items:center; gap:10px;
+    margin-bottom: 10px;
+  }
+  .eyebrow::before{ content:""; width:16px; height:1px; background:var(--gold-soft); }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight: 500;
+    font-size: clamp(32px, 4vw, 46px);
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  h1 em{ font-style: italic; color: var(--gold); font-weight: 500; }
+  .sub{ color: var(--text-dim); font-size: 15px; max-width: 640px; line-height:1.5; }
+
+  /* ---------- Moon phase progress ---------- */
+  .phases{ display:flex; align-items:center; gap:0; margin-top: 26px; }
+  .phase{ display:flex; align-items:center; gap:10px; }
+  .phase .moon{
+    width: 22px; height:22px; border-radius:50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    position:relative; overflow:hidden;
+    transition: box-shadow .4s ease, border-color .4s ease;
+    flex-shrink:0;
+  }
+  .phase .moon::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background: var(--gold);
+    transform: translateX(-100%);
+    transition: transform .5s ease;
+  }
+  .phase.done .moon::after{ transform: translateX(0); }
+  .phase.active .moon{ border-color: var(--gold); box-shadow: 0 0 0 3px rgba(216,196,140,0.12); }
+  .phase.done .moon{ border-color: var(--gold); }
+  .phase-label{ font-size:12.5px; color: var(--text-faint); white-space:nowrap; }
+  .phase.active .phase-label{ color: var(--text); }
+  .phase.done .phase-label{ color: var(--text-dim); }
+  .phase-line{ width: 34px; height:1px; background: var(--border); margin: 0 12px; }
+
+  .sync-bar{
+    display:flex; align-items:center; gap:10px; margin-top:22px; padding: 10px 14px;
+    background: var(--surface); border:1px solid var(--border-soft); border-radius: 10px;
+    font-size: 12.5px; color: var(--text-dim); max-width: fit-content;
+  }
+  .sync-dot{ width:8px; height:8px; border-radius:50%; background: var(--text-faint); flex-shrink:0; }
+  .sync-dot.ok{ background:#7fc98a; box-shadow:0 0 0 3px rgba(127,201,138,0.15); }
+  .sync-dot.err{ background: var(--danger); box-shadow:0 0 0 3px rgba(224,138,138,0.15); }
+  .sync-dot.local{ background: var(--text-faint); }
+  .sync-btn{
+    background:transparent; border:1px solid var(--border); color: var(--text-dim);
+    font: inherit; font-size:11.5px; padding: 5px 10px; border-radius:6px; cursor:pointer; margin-left:4px;
+  }
+  .sync-btn:hover{ border-color: var(--gold-soft); color: var(--text); }
+  .sync-config{
+    margin-top:10px; padding:16px; background: var(--surface); border:1px solid var(--border-soft); border-radius:10px; max-width:560px;
+  }
+  .sync-config label{ font-size:11px; color: var(--text-faint); font-family:'IBM Plex Mono',monospace; letter-spacing:.04em; display:block; margin-bottom:7px; }
+  .sync-config-row{ display:flex; gap:8px; }
+  .sync-config-row input{
+    flex:1; background: var(--bg-2); border:1px solid var(--border); border-radius:7px;
+    color: var(--text); font: inherit; font-size:13px; padding:9px 10px;
+  }
+  .sync-config-row input:focus{ outline:none; border-color: var(--gold-soft); }
+  .sync-hint{ font-size:11.5px; color: var(--text-faint); margin: 10px 0 0; line-height:1.5; }
+
+  /* ---------- Layout ---------- */
+  .grid{ display:grid; grid-template-columns: minmax(320px, 1fr) minmax(380px, 1.05fr); gap: 22px; align-items:start; margin-top: 34px; }
+  @media (max-width: 920px){ .grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 22px;
+  }
+  .panel + .panel{ margin-top: 22px; }
+  .panel-title{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px; letter-spacing:.12em; text-transform:uppercase;
+    color: var(--text-faint); margin: 0 0 14px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .panel-title .n{ color: var(--gold); }
+
+  /* Step 1: toggle */
+  .toggle{
+    display:flex; background: var(--bg-2); border:1px solid var(--border-soft); border-radius: 10px; padding: 4px; gap:4px;
+  }
+  .toggle button{
+    flex:1; padding: 11px 14px; border:none; border-radius: 7px; background: transparent;
+    color: var(--text-dim); font: inherit; font-weight:600; font-size: 13.5px; cursor:pointer;
+    transition: all .2s ease;
+  }
+  .toggle button.on{ background: var(--gold); color: #1a1710; }
+  .toggle button[data-mode="premium"].on{ background: var(--lavender); color: #1c1836; }
+
+  /* Chips (área / categoria) */
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    padding: 9px 15px; border-radius: 999px; border:1px solid var(--border);
+    background: var(--bg-2); color: var(--text-dim); font-size: 13px; font-weight:500;
+    cursor:pointer; transition: all .15s ease; user-select:none;
+  }
+  .chip:hover{ border-color: var(--gold-soft); color: var(--text); }
+  .chip.sel{ background: var(--gold); border-color: var(--gold); color: #1a1710; font-weight:600; }
+  .chip.sel[data-premium="1"]{ background: var(--lavender); border-color: var(--lavender); color:#1c1836; }
+  .empty-hint{ color: var(--text-faint); font-size: 13px; font-style: italic; padding: 6px 2px; }
+
+  /* Serviços list */
+  .services{ display:flex; flex-direction:column; gap:10px; max-height: 480px; overflow-y:auto; padding-right:4px; }
+  .services::-webkit-scrollbar{ width:6px; }
+  .services::-webkit-scrollbar-thumb{ background: var(--border); border-radius:3px; }
+  .svc{
+    border:1px solid var(--border-soft); border-radius: 10px; padding: 13px 14px;
+    background: var(--bg-2); display:flex; justify-content:space-between; align-items:flex-start; gap: 12px;
+  }
+  .svc-info{ flex:1; min-width:0; }
+  .svc-name{ font-weight:600; font-size: 14px; margin-bottom:3px; }
+  .svc-desc{ color: var(--text-faint); font-size: 12.5px; line-height:1.45; }
+  .svc-unit{ color: var(--text-faint); font-size: 11.5px; font-family:'IBM Plex Mono',monospace; margin-top:5px; display:inline-block; }
+  .svc-right{ display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0; }
+  .svc-price{ font-family:'IBM Plex Mono', monospace; font-size: 14.5px; font-weight:500; color: var(--gold); white-space:nowrap; }
+  .svc-price.premium{ color: var(--lavender); }
+  .svc-price.included{ color: #8fcf9a; font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+  .add-btn{
+    border:1px solid var(--gold-soft); background:transparent; color: var(--gold);
+    padding: 6px 13px; border-radius:7px; font-size:12.5px; font-weight:600; cursor:pointer;
+    transition: all .15s ease;
+  }
+  .add-btn:hover{ background: var(--gold); color:#1a1710; }
+  .add-btn.added{ background: var(--gold); color:#1a1710; }
+
+  /* ---------- Orçamento (right) ---------- */
+  .budget-empty{ text-align:center; padding: 50px 20px; color: var(--text-faint); }
+  .budget-empty .glyph{ font-size:26px; margin-bottom:10px; opacity:.6; }
+  .budget-empty p{ font-size:13.5px; line-height:1.6; max-width:280px; margin:0 auto; }
+
+  table.budget{ width:100%; border-collapse:collapse; }
+  table.budget th{
+    text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+    color: var(--text-faint); font-weight:500; padding: 0 8px 10px; border-bottom:1px solid var(--border-soft);
+  }
+  table.budget td{ padding: 12px 8px; border-bottom:1px solid var(--border-soft); vertical-align:top; font-size:13.5px; }
+  table.budget tr:last-child td{ border-bottom:none; }
+  .li-name{ font-weight:600; font-size:13.5px; }
+  .li-tag{ color: var(--text-faint); font-size:11px; font-family:'IBM Plex Mono',monospace; margin-top:3px; }
+  .qty-input, .price-input{
+    width: 62px; background: var(--bg-2); border:1px solid var(--border); border-radius:6px;
+    color: var(--text); font: inherit; font-size:13px; padding:6px 7px; text-align:right;
+  }
+  .price-input{ width: 82px; }
+  .qty-input:focus, .price-input:focus{ outline:none; border-color: var(--gold-soft); }
+  .li-total{ font-family:'IBM Plex Mono',monospace; font-weight:600; white-space:nowrap; }
+  .li-remove{ background:none; border:none; color: var(--text-faint); font-size:17px; cursor:pointer; line-height:1; padding:2px 4px; }
+  .li-remove:hover{ color: var(--danger); }
+
+  .summary{ margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--border); }
+  .sum-row{ display:flex; justify-content:space-between; align-items:center; padding: 9px 0; font-size: 14px; }
+  .sum-row .label{ color: var(--text-dim); display:flex; align-items:center; gap:9px; }
+  .sum-row .val{ font-family:'IBM Plex Mono',monospace; }
+  .sum-row.total{ border-top:1px solid var(--border-soft); margin-top:6px; padding-top:16px; }
+  .sum-row.total .label{ color: var(--text); font-weight:600; font-size:15px; }
+  .sum-row.total .val{ font-family:'Fraunces',serif; font-size: 24px; color: var(--gold); font-weight:500; }
+
+  .switch{ position:relative; width:34px; height:19px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider{ position:absolute; inset:0; background: var(--border); border-radius:999px; cursor:pointer; transition:.2s; }
+  .slider::before{ content:""; position:absolute; width:14px; height:14px; left:2.5px; top:2.5px; background:var(--text-dim); border-radius:50%; transition:.2s; }
+  .switch input:checked + .slider{ background: var(--gold-soft); }
+  .switch input:checked + .slider::before{ transform: translateX(15px); background: var(--gold); }
+  .pct-input{
+    width:50px; background: var(--bg-2); border:1px solid var(--border); border-radius:6px;
+    color: var(--text); font: inherit; font-size:13px; padding:5px 6px; text-align:right;
+  }
+  .pct-input:disabled{ opacity:.35; }
+
+  .footer-actions{ display:flex; gap:10px; margin-top: 18px; }
+  .btn-ghost{
+    flex:1; padding:11px; border-radius:9px; border:1px solid var(--border); background:transparent;
+    color: var(--text-dim); font: inherit; font-size:13px; font-weight:600; cursor:pointer; transition: all .15s ease;
+  }
+  .btn-ghost:hover{ border-color: var(--text-faint); color:var(--text); }
+  .btn-ghost.danger:hover{ border-color: var(--danger); color: var(--danger); }
+
+  .count-badge{
+    background: var(--surface-2); border:1px solid var(--border); color: var(--text-dim);
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:3px 9px; border-radius:999px;
+  }
+
+  /* ---------- Dados do cliente ---------- */
+  .client-fields{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:16px; }
+  .client-fields .full{ grid-column: 1 / -1; }
+  .client-fields label{
+    display:block; font-size:11px; color: var(--text-faint); margin-bottom:5px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:.04em;
+  }
+  .client-fields input{
+    width:100%; background: var(--bg-2); border:1px solid var(--border); border-radius:7px;
+    color: var(--text); font: inherit; font-size:13.5px; padding:9px 10px;
+  }
+  .client-fields input:focus{ outline:none; border-color: var(--gold-soft); }
+
+  .btn-primary{
+    flex:1; padding:12px; border-radius:9px; border:1px solid var(--gold); background: var(--gold);
+    color:#1a1710; font: inherit; font-size:13.5px; font-weight:700; cursor:pointer; transition: all .15s ease;
+  }
+  .btn-primary:hover{ background:#e6d4a0; }
+
+  /* ---------- Quote (client-facing) view ---------- */
+  .quote-view{ display:none; }
+  body.showing-quote .wrap{ display:none; }
+  body.showing-quote .quote-view{ display:block; }
+
+  .quote-actionbar{
+    max-width: 900px; margin: 0 auto 18px; display:flex; justify-content:space-between; align-items:center;
+    padding: 0 4px;
+  }
+  .quote-actionbar button{
+    padding: 10px 18px; border-radius:9px; font: inherit; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .btn-back{ background:transparent; border:1px solid var(--border); color: var(--text-dim); }
+  .btn-back:hover{ color:var(--text); border-color: var(--text-faint); }
+  .btn-pdf{ background: var(--gold); border:1px solid var(--gold); color:#1a1710; }
+  .btn-pdf:hover{ background:#e6d4a0; }
+
+  .quote-paper{
+    max-width: 900px; margin: 0 auto; background: #fbf9f4; color: #221f1a; border-radius: 4px;
+    padding: 56px 64px; font-family:'Inter', sans-serif;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.35);
+  }
+  .quote-head{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #221f1a; padding-bottom:22px; margin-bottom: 28px; }
+  .quote-brand{ font-family:'Fraunces', serif; font-size: 22px; letter-spacing:.02em; }
+  .quote-brand .glyph{ color:#b6944f; margin-right:6px; }
+  .quote-brand-sub{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#8a8577; margin-top:4px; }
+  .quote-meta{ text-align:right; font-size:12.5px; color:#5c574c; line-height:1.7; }
+  .quote-meta strong{ color:#221f1a; }
+  .quote-title{ font-family:'Fraunces', serif; font-size: 30px; margin: 0 0 6px; }
+  .quote-to{ font-size: 14px; color:#5c574c; margin-bottom: 32px; }
+  .quote-to strong{ color:#221f1a; }
+
+  table.quote-table{ width:100%; border-collapse:collapse; margin-bottom: 8px; }
+  table.quote-table th{
+    text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:#8a8577; font-weight:500; padding: 0 6px 10px; border-bottom: 1.5px solid #221f1a;
+  }
+  table.quote-table td{ padding: 13px 6px; border-bottom: 1px solid #e2ddd0; font-size: 13.5px; vertical-align:top; }
+  table.quote-table .q-name{ font-weight:600; }
+  table.quote-table .q-desc{ color:#8a8577; font-size:12px; margin-top:2px; }
+  table.quote-table td.num{ text-align:right; font-family:'IBM Plex Mono',monospace; white-space:nowrap; }
+
+  .quote-totals{ margin-left:auto; width: 300px; margin-top: 18px; }
+  .quote-totals .row{ display:flex; justify-content:space-between; padding: 7px 0; font-size:13.5px; color:#5c574c; }
+  .quote-totals .row.total{ border-top: 2px solid #221f1a; margin-top:6px; padding-top:14px; font-size:17px; font-weight:700; color:#221f1a; }
+  .quote-totals .row.total .val{ font-family:'Fraunces', serif; }
+
+  .quote-footer{ margin-top: 48px; padding-top: 20px; border-top: 1px solid #e2ddd0; font-size: 11.5px; color:#8a8577; line-height:1.7; }
+
+  @media print{
+    body{ background: white !important; padding:0; }
+    .wrap{ display:none !important; }
+    .quote-view{ display:block !important; }
+    .quote-actionbar{ display:none !important; }
+    .quote-paper{ box-shadow:none; padding:0; max-width:100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Moonlight · Base de Serviços</div>
+    <h1>Simulador de <em>Orçamento</em></h1>
+    <div class="sub">Seleciona o tipo de preço, a área, a categoria e os serviços. O orçamento é construído à direita, com IVA e desconto opcionais.</div>
+
+    <div class="phases" id="phases">
+      <div class="phase" data-step="1"><div class="moon"></div><div class="phase-label">Preço</div></div>
+      <div class="phase-line"></div>
+      <div class="phase" data-step="2"><div class="moon"></div><div class="phase-label">Área</div></div>
+      <div class="phase-line"></div>
+      <div class="phase" data-step="3"><div class="moon"></div><div class="phase-label">Categoria</div></div>
+      <div class="phase-line"></div>
+      <div class="phase" data-step="4"><div class="moon"></div><div class="phase-label">Serviços</div></div>
+    </div>
+
+    <div class="sync-bar" id="syncBar">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncText">A verificar ligação…</span>
+      <button id="syncRefresh" class="sync-btn" title="Voltar a carregar preços">↻ Atualizar preços</button>
+      <button id="syncConfig" class="sync-btn" title="Ligar a uma Google Sheet">🔗 Ligar a Google Sheet</button>
+    </div>
+
+    <div class="sync-config" id="syncConfigPanel" style="display:none;">
+      <label>Link CSV publicado da Google Sheet</label>
+      <div class="sync-config-row">
+        <input type="text" id="syncUrlInput" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&amp;gid=0">
+        <button id="syncUrlSave" class="btn-primary" style="flex:none; padding:10px 16px;">Ligar</button>
+      </div>
+      <p class="sync-hint">Esta ligação só fica ativa nesta sessão do browser. Depois de confirmares que funciona, pede para o link ficar gravado no ficheiro para toda a equipa.</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: selection flow -->
+    <div>
+      <div class="panel">
+        <div class="panel-title"><span><span class="n">01</span> — Tipo de preço</span></div>
+        <div class="toggle">
+          <button data-mode="base" class="on">Preço Base</button>
+          <button data-mode="premium">Preço Premium</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span><span class="n">02</span> — Área</span></div>
+        <div class="chips" id="areaChips"></div>
+      </div>
+
+      <div class="panel" id="catPanel" style="display:none;">
+        <div class="panel-title"><span><span class="n">03</span> — Categoria</span></div>
+        <div class="chips" id="catChips"></div>
+      </div>
+
+      <div class="panel" id="svcPanel" style="display:none;">
+        <div class="panel-title">
+          <span><span class="n">04</span> — Serviços</span>
+          <span class="count-badge" id="svcCount">0</span>
+        </div>
+        <div class="services" id="svcList"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: orçamento -->
+    <div class="panel" style="position:sticky; top:24px;">
+      <div class="panel-title"><span>Orçamento</span><span class="count-badge" id="lineCount">0 itens</span></div>
+
+      <div class="client-fields">
+        <div>
+          <label>Cliente</label>
+          <input type="text" id="clientName" placeholder="Nome do cliente">
+        </div>
+        <div>
+          <label>Projeto</label>
+          <input type="text" id="clientProject" placeholder="Nome do projeto">
+        </div>
+        <div class="full">
+          <label>Validade da proposta (dias)</label>
+          <input type="number" id="clientValidity" value="15" min="1" step="1">
+        </div>
+      </div>
+
+      <div id="budgetEmpty" class="budget-empty">
+        <div class="glyph">☾</div>
+        <p>Ainda sem serviços adicionados.<br>Escolhe uma área à esquerda para começar.</p>
+      </div>
+
+      <table class="budget" id="budgetTable" style="display:none;">
+        <thead>
+          <tr><th>Serviço</th><th>Qtd.</th><th>Preço unit.</th><th>Total</th><th></th></tr>
+        </thead>
+        <tbody id="budgetBody"></tbody>
+      </table>
+
+      <div class="summary" id="summaryBlock" style="display:none;">
+        <div class="sum-row">
+          <div class="label">Subtotal</div>
+          <div class="val" id="sumSubtotal">0,00 €</div>
+        </div>
+
+        <div class="sum-row">
+          <div class="label">
+            <label class="switch"><input type="checkbox" id="descontoOn"><span class="slider"></span></label>
+            Desconto
+            <input type="number" class="pct-input" id="descontoPct" value="10" min="0" max="100" step="1" disabled> %
+          </div>
+          <div class="val" id="sumDesconto">— 0,00 €</div>
+        </div>
+
+        <div class="sum-row">
+          <div class="label">
+            <label class="switch"><input type="checkbox" id="ivaOn"><span class="slider"></span></label>
+            IVA
+            <input type="number" class="pct-input" id="ivaPct" value="23" min="0" max="100" step="1" disabled> %
+          </div>
+          <div class="val" id="sumIva">+ 0,00 €</div>
+        </div>
+
+        <div class="sum-row total">
+          <div class="label">Total</div>
+          <div class="val" id="sumTotal">0,00 €</div>
+        </div>
+      </div>
+
+      <div class="footer-actions" id="footerActions" style="display:none;">
+        <button class="btn-primary" id="quoteBtn">Criar orçamento para cliente →</button>
+      </div>
+      <div class="footer-actions" id="footerActions2" style="display:none; margin-top:10px;">
+        <button class="btn-ghost" id="exportBtn">Exportar .csv</button>
+        <button class="btn-ghost danger" id="clearBtn">Limpar orçamento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Client-facing quote / proposal ---------- -->
+<div class="quote-view" id="quoteView">
+  <div class="quote-actionbar">
+    <button class="btn-back" id="quoteBack">← Voltar ao simulador</button>
+    <button class="btn-pdf" id="quotePdf">Guardar como PDF</button>
+  </div>
+  <div class="quote-paper" id="quotePaper">
+    <div class="quote-head">
+      <div>
+        <div class="quote-brand"><span class="glyph">☾</span>MOONLIGHT</div>
+        <div class="quote-brand-sub">Proposta de Orçamento</div>
+      </div>
+      <div class="quote-meta">
+        <div>Data: <strong id="qDate"></strong></div>
+        <div>Válido até: <strong id="qValidUntil"></strong></div>
+        <div id="qModeMeta"></div>
+      </div>
+    </div>
+
+    <div class="quote-to">
+      Para: <strong id="qClientName">—</strong><br>
+      <span id="qProjectLine"></span>
+    </div>
+
+    <table class="quote-table">
+      <thead>
+        <tr><th>Serviço</th><th style="text-align:right;">Qtd.</th><th style="text-align:right;">Preço unit.</th><th style="text-align:right;">Total</th></tr>
+      </thead>
+      <tbody id="quoteBody"></tbody>
+    </table>
+
+    <div class="quote-totals">
+      <div class="row"><span>Subtotal</span><span class="val" id="qSubtotal"></span></div>
+      <div class="row" id="qDescRow"><span id="qDescLabel">Desconto</span><span class="val" id="qDesc"></span></div>
+      <div class="row" id="qIvaRow"><span id="qIvaLabel">IVA</span><span class="val" id="qIva"></span></div>
+      <div class="row total"><span>Total</span><span class="val" id="qTotal"></span></div>
+    </div>
+
+    <div class="quote-footer">
+      Proposta gerada em <span id="qFooterDate"></span> e válida por <span id="qFooterValidity"></span> dias a partir desta data.<br>
+      Valores em euros (€). Este documento não constitui fatura.
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT9rDCJ7VLDyVUdkHMfkIRSm0pPRjKmF5s0FbGWkNSFzBhQhdPOjyeBVReCFq3uDolRgTZz2fa1shON/pub?gid=442737104&single=true&output=csv"; // <-- link fixo da Google Sheet
+
+const FALLBACK_SERVICES = [{"area":"MARKETING CONSULTING","categoria":"Consultoria","servico":"Sessão de consultoria - 60 min","unidade":"sessão","inclui":"Sessão estratégica individual para análise de desafios e definição de próximos passos.","precoBase":150.0,"precoPremium":180.0},{"area":"MARKETING CONSULTING","categoria":"Consultoria","servico":"Sessão de consultoria - 90 min","unidade":"sessão","inclui":"Sessão estratégica aprofundada com análise, discussão e recomendações.","precoBase":200.0,"precoPremium":240.0},{"area":"MARKETING CONSULTING","categoria":"Consultoria","servico":"Consultoria mensal","unidade":"mês","inclui":"Acompanhamento estratégico recorrente.","precoBase":450.0,"precoPremium":540.0},{"area":"MARKETING CONSULTING","categoria":"Consultoria","servico":"Sessão de brainstorming estratégico - 90 min","unidade":"sessão","inclui":"Sessão focada em ideias, campanhas, conteúdos ou resolução de um desafio específico.","precoBase":250.0,"precoPremium":300.0},{"area":"MARKETING CONSULTING","categoria":"Consultoria","servico":"Workshop estratégico - até 3h","unidade":"workshop","inclui":"Workshop estruturado com marca ou equipa.","precoBase":450.0,"precoPremium":540.0},{"area":"MARKETING CONSULTING","categoria":"Consultoria","servico":"Formação de equipa - até 3h","unidade":"sessão","inclui":"Formação personalizada em marketing, branding, conteúdo ou redes sociais.","precoBase":500.0,"precoPremium":600.0},{"area":"MARKETING CONSULTING","categoria":"Auditorias","servico":"Auditoria de marca","unidade":"projeto","inclui":"Análise global da marca, posicionamento, identidade e coerência.","precoBase":450.0,"precoPremium":540.0},{"area":"MARKETING CONSULTING","categoria":"Auditorias","servico":"Auditoria de redes sociais","unidade":"projeto","inclui":"Análise de perfis, conteúdo, posicionamento e desempenho.","precoBase":250.0,"precoPremium":300.0},{"area":"MARKETING CONSULTING","categoria":"Planeamento Estratégico","servico":"Plano de marketing","unidade":"projeto","inclui":"Documento estratégico com objetivos, ações, canais e prioridades.","precoBase":750.0,"precoPremium":900.0},{"area":"BRAND STRATEGY","categoria":"Discovery","servico":"Discovery call","unidade":"sessão","inclui":"Reunião inicial para compreender negócio, contexto, necessidades e objetivos.","precoBase":"Incluido","precoPremium":"Incluido"},{"area":"BRAND STRATEGY","categoria":"Discovery","servico":"Workshop de marca","unidade":"sessão","inclui":"Sessão colaborativa para alinhar visão, posicionamento e comunicação.","precoBase":200.0,"precoPremium":240.0},{"area":"BRAND STRATEGY","categoria":"Research","servico":"Research estratégico","unidade":"projeto","inclui":"Mercado+concorrência+SWOT","precoBase":250.0,"precoPremium":300.0},{"area":"BRAND STRATEGY","categoria":"Posicionamento","servico":"Posicionamento de marca","unidade":"módulo","inclui":"Missão, visão, valores, proposta de valor ","precoBase":300.0,"precoPremium":360.0},{"area":"BRAND STRATEGY","categoria":"Público","servico":"ICP + Buyer persona","unidade":"módulo","inclui":"Definição do perfil de cliente ideal + Construção de uma persona detalhada.","precoBase":200.0,"precoPremium":240.0},{"area":"BRAND STRATEGY","categoria":"Público","servico":"Customer journey","unidade":"módulo","inclui":"Mapeamento das etapas da relação do cliente com a marca.","precoBase":180.0,"precoPremium":216.0},{"area":"BRAND STRATEGY","categoria":"Comunicação","servico":"Tone of voice + Brand story","unidade":"módulo","inclui":"Definição do tom, linguagem e regras de comunicação.\nConstrução da narrativa central da marca.","precoBase":250.0,"precoPremium":300.0},{"area":"BRAND STRATEGY","categoria":"Comunicação","servico":"SEO & Content Framework","unidade":"módulo","inclui":"Estrutura de mensagens por público, objetivo ou canal.\nLista estratégica de palavras-chave relevantes.\nSeleção de hashtags por categoria e intenção.","precoBase":150.0,"precoPremium":180.0},{"area":"BRAND STRATEGY","categoria":"Estratégia de Conteúdo","servico":"Pilares de comunicação","unidade":"módulo","inclui":"Definição dos grandes temas da marca.\nDesdobramento dos pilares em temas concretos.","precoBase":180.0,"precoPremium":216.0},{"area":"BRAND STRATEGY","categoria":"Estratégia de Conteúdo","servico":"Estratégia de conteúdo","unidade":"módulo","inclui":"Cruzamento entre temas, objetivos, formatos e públicos.\nDefinição do papel de cada canal de comunicação.","precoBase":250.0,"precoPremium":300.0},{"area":"BRAND STRATEGY","categoria":"Estratégia de Conteúdo","servico":"Plano editorial","unidade":"módulo","inclui":"Estrutura de publicação e orientação de conteúdos.","precoBase":180.0,"precoPremium":216.0},{"area":"BRAND STRATEGY","categoria":"Estratégia de Conteúdo","servico":"Roadmap estratégico","unidade":"módulo","inclui":"Plano faseado de implementação da estratégia.","precoBase":220.0,"precoPremium":264.0},{"area":"BRAND STRATEGY","categoria":"Brand Strategy Completa","servico":"Brand Strategy Completa","unidade":"módulo","inclui":"Todos os módulos","precoBase":1450.0,"precoPremium":1740.0},{"area":"BRANDING","categoria":"Logótipo","servico":"Logótipo Suite","unidade":"projeto","inclui":"Logo principal+secundário+submark+favicon","precoBase":200.0,"precoPremium":240.0},{"area":"BRANDING","categoria":"Sistema Visual","servico":"Brand board","unidade":"módulo","inclui":"Paleta+tipografia+elementos","precoBase":100.0,"precoPremium":120.0},{"area":"BRANDING","categoria":"Sistema Visual","servico":"Brand board","unidade":"módulo","inclui":"Moodboard, conceito visual, direção visual","precoBase":150.0,"precoPremium":180.0},{"area":"BRANDING","categoria":"Guidelines","servico":"Manual de marca","unidade":"documento","inclui":null,"precoBase":250.0,"precoPremium":300.0},{"area":"BRANDING","categoria":"Templates","servico":"Pack de templates Instagram","unidade":"pack","inclui":"Pack Templates Canva","precoBase":200.0,"precoPremium":240.0},{"area":"BRANDING","categoria":"Material Corporativo","servico":"Material Corporativo","unidade":"peça","inclui":"Cartão de visita, Assinatura de email","precoBase":100.0,"precoPremium":120.0},{"area":"BRANDING","categoria":"Branding Completo","servico":"Branding Completo","unidade":"peça","inclui":"Todos os módulos","precoBase":950.0,"precoPremium":1140.0},{"area":"SOCIAL MEDIA","categoria":"Setup","servico":"Setup inicial de conta","unidade":"projeto","inclui":"Reescrita e organização da biografia.\nDefinição de estrutura e ordem dos destaques.\nConfiguração base antes do início da gestão.","precoBase":100.0,"precoPremium":120.0},{"area":"SOCIAL MEDIA","categoria":"Planeamento Mensal","servico":"Planeamento mensal - 6 conteúdos","unidade":"mês","inclui":null,"precoBase":250.0,"precoPremium":300.0},{"area":"SOCIAL MEDIA","categoria":"Planeamento Mensal","servico":"Planeamento mensal - 9 conteúdos","unidade":"mês","inclui":null,"precoBase":400.0,"precoPremium":480.0},{"area":"SOCIAL MEDIA","categoria":"Planeamento Mensal","servico":"Planeamento mensal - 12 conteúdos","unidade":"mês","inclui":null,"precoBase":550.0,"precoPremium":660.0},{"area":"SOCIAL MEDIA","categoria":"Planeamento Mensal","servico":"Calendário editorial","unidade":"mês","inclui":null,"precoBase":150.0,"precoPremium":180.0},{"area":"SOCIAL MEDIA","categoria":"Planeamento Mensal","servico":"Plano de stories","unidade":"mês","inclui":null,"precoBase":120.0,"precoPremium":144.0},{"area":"SOCIAL MEDIA","categoria":"Criação de Conteúdo","servico":"Reel com material fornecido pelo cliente","unidade":"conteúdo","inclui":"Até 3 reels mensais sem custo adicional, para mais de 3 reels mensais, tem custo unitário","precoBase":50.0,"precoPremium":60.0},{"area":"SOCIAL MEDIA","categoria":"Gestão","servico":"Community management - horário laboral","unidade":"mês","inclui":"Comentários+DM","precoBase":150.0,"precoPremium":180.0},{"area":"SOCIAL MEDIA","categoria":"Reporting","servico":"Relatório mensal","unidade":"mês","inclui":null,"precoBase":120.0,"precoPremium":144.0},{"area":"SOCIAL MEDIA","categoria":"Social Media Completo (base)","servico":"Social Media Completo (base)","unidade":null,"inclui":"Set up + 9 conteúdos","precoBase":500.0,"precoPremium":600.0},{"area":"CONTENT PRODUCTION","categoria":"Direção Criativa","servico":"Conceito","unidade":"módulo","inclui":"Conceito criativo, Conceito de campanha, Storytelling da campanha, Narrativa criativa, Moodboard","precoBase":350.0,"precoPremium":420.0},{"area":"CONTENT PRODUCTION","categoria":"Direção Criativa","servico":"Plano de conteúdos da sessão","unidade":"módulo","inclui":null,"precoBase":150.0,"precoPremium":180.0},{"area":"CONTENT PRODUCTION","categoria":"Direção em Set","servico":"Direção criativa em set - 2h","unidade":"sessão","inclui":null,"precoBase":120.0,"precoPremium":144.0},{"area":"CONTENT PRODUCTION","categoria":"Direção em Set","servico":"Direção criativa em set - meio dia","unidade":"sessão","inclui":null,"precoBase":240.0,"precoPremium":288.0},{"area":"CONTENT PRODUCTION","categoria":"Direção em Set","servico":"Direção criativa em set - dia completo","unidade":"sessão","inclui":null,"precoBase":400.0,"precoPremium":480.0},{"area":"CONTENT PRODUCTION","categoria":"Captação","servico":"Captação de conteúdo - 2h","unidade":"sessão","inclui":null,"precoBase":180.0,"precoPremium":216.0},{"area":"CONTENT PRODUCTION","categoria":"Captação","servico":"Captação de conteúdo - meio dia","unidade":"sessão","inclui":null,"precoBase":300.0,"precoPremium":360.0},{"area":"CONTENT PRODUCTION","categoria":"Captação","servico":"Captação de conteúdo - dia completo","unidade":"sessão","inclui":null,"precoBase":550.0,"precoPremium":660.0},{"area":"CONTENT PRODUCTION","categoria":"Tipo de Produção","servico":"Fotografia de produto","unidade":"pack","inclui":null,"precoBase":200.0,"precoPremium":240.0},{"area":"CONTENT PRODUCTION","categoria":"Tipo de Produção","servico":"Fotografia lifestyle","unidade":"pack","inclui":null,"precoBase":300.0,"precoPremium":360.0},{"area":"CONTENT PRODUCTION","categoria":"Tipo de Produção","servico":"Behind the scenes","unidade":"projeto","inclui":null,"precoBase":250.0,"precoPremium":300.0},{"area":"CONTENT PRODUCTION","categoria":"Tipo de Produção","servico":"Cobertura de evento","unidade":"projeto","inclui":"meio dia","precoBase":450.0,"precoPremium":540.0},{"area":"CONTENT PRODUCTION","categoria":"Pós-Produção","servico":"Edição de vídeo simples (pack 5 vídeos)","unidade":"vídeo","inclui":null,"precoBase":180.0,"precoPremium":216.0},{"area":"CONTENT PRODUCTION","categoria":"UGC - Extras","servico":"Pack 3 vídeos (até 60s)","unidade":"extra","inclui":null,"precoBase":80.0,"precoPremium":96.0},{"area":"CONTENT PRODUCTION","categoria":"Content Production Completo (base)","servico":"Content Production Completo (base)","unidade":null,"inclui":"conceito + plano conteúdos + pós produção","precoBase":680.0,"precoPremium":816.0},{"area":"EMAIL MARKETING","categoria":"Estratégia","servico":"Estratégia de email marketing","unidade":"projeto","inclui":null,"precoBase":100.0,"precoPremium":120.0},{"area":"EMAIL MARKETING","categoria":"Estratégia","servico":"Planeamento mensal","unidade":"projeto","inclui":null,"precoBase":100.0,"precoPremium":120.0},{"area":"EMAIL MARKETING","categoria":"Estratégia","servico":"Calendário de campanhas","unidade":"projeto","inclui":null,"precoBase":50.0,"precoPremium":60.0},{"area":"EMAIL MARKETING","categoria":"Produção","servico":"Newsletters 4 por semana","unidade":"email","inclui":null,"precoBase":100.0,"precoPremium":120.0},{"area":"EMAIL MARKETING","categoria":"Produção","servico":"Template de newsletter","unidade":"template","inclui":null,"precoBase":20.0,"precoPremium":24.0},{"area":"EMAIL MARKETING","categoria":"Campanhas","servico":"Campanhas sazonais, descontos, extras","unidade":"campanha","inclui":null,"precoBase":180.0,"precoPremium":216.0},{"area":"EMAIL MARKETING","categoria":"Automações","servico":"Valor por fluxo","unidade":"automação","inclui":null,"precoBase":250.0,"precoPremium":300.0},{"area":"EMAIL MARKETING","categoria":"Reporting","servico":"Relatório completo de métricas","unidade":"relatório","inclui":null,"precoBase":80.0,"precoPremium":96.0},{"area":"EMAIL MARKETING","categoria":"Email marketing Completo (base)","servico":"Email marketing Completo (base)","unidade":null,"inclui":"estratégia + produção + report","precoBase":450.0,"precoPremium":540.0},{"area":"EXTRAS","categoria":"Revisões e Alterações","servico":"Revisão extra","unidade":"ronda","inclui":null,"precoBase":40.0,"precoPremium":48.0},{"area":"EXTRAS","categoria":"Revisões e Alterações","servico":"Reformulação de trabalho aprovado","unidade":"projeto","inclui":null,"precoBase":50.0,"precoPremium":60.0},{"area":"EXTRAS","categoria":"Reuniões","servico":"Reunião extra","unidade":"reunião","inclui":null,"precoBase":40.0,"precoPremium":48.0},{"area":"EXTRAS","categoria":"Reuniões","servico":"Reunião extra - 60 min","unidade":"reunião","inclui":null,"precoBase":75.0,"precoPremium":90.0},{"area":"EXTRAS","categoria":"Urgência","servico":"Urgência - entrega até 48h","unidade":"+25%","inclui":"Agravamento sobre o valor total do projeto por prazo de entrega reduzido. Preço não é fixo — define o valor em euros ao adicionar.","precoBase":null,"precoPremium":0.0},{"area":"EXTRAS","categoria":"Urgência","servico":"Urgência - entrega até 24h","unidade":"+50%","inclui":"Agravamento sobre o valor total do projeto por prazo de entrega muito reduzido. Preço não é fixo — define o valor em euros ao adicionar.","precoBase":null,"precoPremium":0.0},{"area":"EXTRAS","categoria":"Deslocações","servico":"Deslocação até 20 km","unidade":"deslocação","inclui":null,"precoBase":25.0,"precoPremium":30.0},{"area":"EXTRAS","categoria":"Deslocações","servico":"Km adicional","unidade":"km","inclui":null,"precoBase":0.5,"precoPremium":0.6}]
+;
+
+let SERVICES = FALLBACK_SERVICES;
+let lastSync = null;
+
+const state = {
+  mode: 'base',           // 'base' | 'premium'
+  area: null,
+  categoria: null,
+  budget: [],             // {id, servico, area, categoria, unidade, qty, price}
+};
+let uid = 1;
+
+const fmt = (n) => (isFinite(n)?n:0).toLocaleString('pt-PT', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+
+function uniqueAreas(){
+  return [...new Set(SERVICES.map(s=>s.area))];
+}
+function categoriesFor(area){
+  return [...new Set(SERVICES.filter(s=>s.area===area).map(s=>s.categoria))];
+}
+function servicesFor(area, cat){
+  return SERVICES.filter(s=>s.area===area && s.categoria===cat);
+}
+
+function priceOf(svc){
+  return state.mode === 'base' ? svc.precoBase : svc.precoPremium;
+}
+
+function renderPhases(){
+  const p1 = true; // price mode always "chosen" (has default)
+  const p2 = !!state.area;
+  const p3 = !!state.categoria;
+  const p4 = state.budget.length > 0;
+  const flags = [p1,p2,p3,p4];
+  document.querySelectorAll('.phase').forEach((el,i)=>{
+    el.classList.remove('done','active');
+    if(flags[i]) el.classList.add('done');
+  });
+  // mark the "active" (next-to-do) step
+  const nextIdx = flags.findIndex(f=>!f);
+  if(nextIdx>=0) document.querySelectorAll('.phase')[nextIdx].classList.add('active');
+}
+
+function renderAreaChips(){
+  const wrap = document.getElementById('areaChips');
+  wrap.innerHTML = '';
+  uniqueAreas().forEach(area=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (state.area===area ? ' sel' : '');
+    if(state.mode==='premium') chip.dataset.premium = '1';
+    chip.textContent = titleCase(area);
+    chip.onclick = () => {
+      state.area = (state.area === area) ? null : area;
+      state.categoria = null;
+      renderAll();
+    };
+    wrap.appendChild(chip);
+  });
+}
+
+function renderCatChips(){
+  const panel = document.getElementById('catPanel');
+  const wrap = document.getElementById('catChips');
+  wrap.innerHTML = '';
+  if(!state.area){ panel.style.display='none'; return; }
+  panel.style.display='block';
+  categoriesFor(state.area).forEach(cat=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (state.categoria===cat ? ' sel' : '');
+    if(state.mode==='premium') chip.dataset.premium = '1';
+    chip.textContent = cat;
+    chip.onclick = () => {
+      state.categoria = (state.categoria === cat) ? null : cat;
+      renderAll();
+    };
+    wrap.appendChild(chip);
+  });
+}
+
+function renderServices(){
+  const panel = document.getElementById('svcPanel');
+  const list = document.getElementById('svcList');
+  list.innerHTML = '';
+  if(!state.area || !state.categoria){ panel.style.display='none'; return; }
+  panel.style.display='block';
+  const svcs = servicesFor(state.area, state.categoria);
+  document.getElementById('svcCount').textContent = svcs.length;
+
+  svcs.forEach(svc=>{
+    const row = document.createElement('div');
+    row.className = 'svc';
+
+    const price = priceOf(svc);
+    let priceLabel, priceClass = state.mode==='premium' ? 'premium' : '';
+    let numericPrice = 0;
+    if(price === 'Incluido'){
+      priceLabel = 'Incluído';
+      priceClass += ' included';
+      numericPrice = 0;
+    } else if(price === null || price === undefined){
+      priceLabel = '—';
+      numericPrice = 0;
+    } else {
+      priceLabel = fmt(price);
+      numericPrice = price;
+    }
+
+    const already = state.budget.some(li => li.servico===svc.servico && li.area===svc.area && li.categoria===svc.categoria);
+
+    row.innerHTML = `
+      <div class="svc-info">
+        <div class="svc-name">${escapeHtml(svc.servico)}</div>
+        ${svc.inclui ? `<div class="svc-desc">${escapeHtml(svc.inclui)}</div>` : ''}
+        ${svc.unidade ? `<span class="svc-unit">/ ${escapeHtml(svc.unidade)}</span>` : ''}
+      </div>
+      <div class="svc-right">
+        <div class="svc-price ${priceClass}">${priceLabel}</div>
+        <button class="add-btn ${already?'added':''}">${already?'Adicionado ✓':'+ Adicionar'}</button>
+      </div>
+    `;
+    row.querySelector('.add-btn').onclick = () => {
+      addToBudget(svc, numericPrice);
+    };
+    list.appendChild(row);
+  });
+}
+
+function addToBudget(svc, numericPrice){
+  const exists = state.budget.find(li => li.servico===svc.servico && li.area===svc.area && li.categoria===svc.categoria);
+  if(exists){
+    exists.qty += 1;
+  } else {
+    state.budget.push({
+      id: uid++,
+      servico: svc.servico,
+      area: svc.area,
+      categoria: svc.categoria,
+      unidade: svc.unidade,
+      qty: 1,
+      price: numericPrice
+    });
+  }
+  renderAll();
+}
+
+function renderBudget(){
+  const body = document.getElementById('budgetBody');
+  const table = document.getElementById('budgetTable');
+  const empty = document.getElementById('budgetEmpty');
+  const summary = document.getElementById('summaryBlock');
+  const footer = document.getElementById('footerActions');
+  document.getElementById('lineCount').textContent = state.budget.length + (state.budget.length===1 ? ' item' : ' itens');
+
+  if(state.budget.length === 0){
+    table.style.display='none'; empty.style.display='block';
+    summary.style.display='none'; footer.style.display='none';
+    return;
+  }
+  table.style.display='table'; empty.style.display='none';
+  summary.style.display='block'; footer.style.display='flex';
+  document.getElementById('footerActions2').style.display='flex';
+
+  body.innerHTML = '';
+  state.budget.forEach(li=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="li-name">${escapeHtml(li.servico)}</div>
+        <div class="li-tag">${escapeHtml(li.area)} · ${escapeHtml(li.categoria)}${li.unidade ? ' · /'+escapeHtml(li.unidade) : ''}</div>
+      </td>
+      <td><input type="number" class="qty-input" min="0" step="1" value="${li.qty}"></td>
+      <td><input type="number" class="price-input" min="0" step="0.01" value="${li.price}"></td>
+      <td class="li-total">${fmt(li.qty * li.price)}</td>
+      <td><button class="li-remove" title="Remover">×</button></td>
+    `;
+    tr.querySelector('.qty-input').oninput = (e)=>{ li.qty = parseFloat(e.target.value)||0; renderBudget(); renderTotals(); };
+    tr.querySelector('.price-input').oninput = (e)=>{ li.price = parseFloat(e.target.value)||0; renderBudget(); renderTotals(); };
+    tr.querySelector('.li-remove').onclick = ()=>{ state.budget = state.budget.filter(x=>x.id!==li.id); renderAll(); };
+    body.appendChild(tr);
+  });
+
+  renderTotals();
+}
+
+function renderTotals(){
+  const subtotal = state.budget.reduce((s,li)=>s + li.qty*li.price, 0);
+  const descOn = document.getElementById('descontoOn').checked;
+  const ivaOn = document.getElementById('ivaOn').checked;
+  const descPct = parseFloat(document.getElementById('descontoPct').value) || 0;
+  const ivaPct = parseFloat(document.getElementById('ivaPct').value) || 0;
+
+  const descValor = descOn ? subtotal * (descPct/100) : 0;
+  const baseComDesconto = subtotal - descValor;
+  const ivaValor = ivaOn ? baseComDesconto * (ivaPct/100) : 0;
+  const total = baseComDesconto + ivaValor;
+
+  document.getElementById('sumSubtotal').textContent = fmt(subtotal);
+  document.getElementById('sumDesconto').textContent = '— ' + fmt(descValor);
+  document.getElementById('sumIva').textContent = '+ ' + fmt(ivaValor);
+  document.getElementById('sumTotal').textContent = fmt(total);
+}
+
+function titleCase(s){
+  return s.split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+}
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ================= Google Sheet sync ================= */
+
+function detectDelimiter(firstLine){
+  let commas=0, semis=0, inQ=false;
+  for(const c of firstLine){
+    if(c === '"') inQ=!inQ;
+    else if(!inQ && c===',') commas++;
+    else if(!inQ && c===';') semis++;
+  }
+  return semis > commas ? ';' : ',';
+}
+
+function parseCSV(text, delim){
+  const rows = []; let row=[]; let field=''; let inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i++; } else inQ=false; }
+      else field += c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===delim){ row.push(field); field=''; }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(c==='\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(f => f.trim() !== ''));
+}
+
+function norm(s){
+  return String(s||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,''); // remove acentos
+}
+
+function parsePrice(raw){
+  const v = String(raw||'').trim();
+  if(v === '') return null;
+  if(norm(v).startsWith('incluid')) return 'Incluido';
+  const n = parseFloat(v.replace(/[€\s]/g,'').replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+function parseUnidade(raw){
+  const v = String(raw||'').trim();
+  if(v === '') return null;
+  if(v.includes('%')) return (v.startsWith('+') || v.startsWith('-')) ? v : ('+'+v);
+  const n = parseFloat(v.replace(',', '.'));
+  if(!isNaN(n) && n > 0 && n < 1) return '+' + Math.round(n*100) + '%';
+  return v;
+}
+
+function servicesFromCSV(text){
+  const delim = detectDelimiter(text.split('\n')[0]);
+  const rows = parseCSV(text, delim);
+  if(rows.length < 2) throw new Error('Folha vazia ou sem dados.');
+
+  const header = rows[0].map(norm);
+  const col = (names) => {
+    for(const name of names){
+      const idx = header.findIndex(h => h === norm(name));
+      if(idx >= 0) return idx;
+    }
+    return -1;
+  };
+  const iArea = col(['Área','Area']);
+  const iCat = col(['Categoria']);
+  const iServ = col(['Serviço','Servico']);
+  const iUnid = col(['Unidade']);
+  const iIncl = col(['Inclui']);
+  const iBase = col(['Preço Recomendado','Preco Recomendado','Preço Base','Preco Base']);
+  const iPrem = col(['Preço Premium','Preco Premium']);
+  const iAtivo = col(['Ativo?','Ativo']);
+
+  if(iServ < 0) throw new Error('Não encontrei a coluna "Serviço" no cabeçalho.');
+
+  let lastArea = '', lastCat = '';
+  const out = [];
+  for(let r=1; r<rows.length; r++){
+    const row = rows[r];
+    const areaRaw = iArea>=0 ? row[iArea]?.trim() : '';
+    const catRaw = iCat>=0 ? row[iCat]?.trim() : '';
+    const serv = iServ>=0 ? row[iServ]?.trim() : '';
+    if(!serv) continue;
+    if(areaRaw) lastArea = areaRaw;
+    if(catRaw) lastCat = catRaw;
+    const ativo = iAtivo>=0 ? row[iAtivo]?.trim() : 'Sim';
+    if(ativo && !norm(ativo).startsWith('s')) continue;
+
+    out.push({
+      area: lastArea,
+      categoria: lastCat,
+      servico: serv,
+      unidade: iUnid>=0 ? parseUnidade(row[iUnid]) : null,
+      inclui: iIncl>=0 ? (row[iIncl]?.trim() || null) : null,
+      precoBase: iBase>=0 ? parsePrice(row[iBase]) : null,
+      precoPremium: iPrem>=0 ? parsePrice(row[iPrem]) : null,
+    });
+  }
+  return out;
+}
+
+function setSyncStatus(kind, text){
+  const dot = document.getElementById('syncDot');
+  dot.className = 'sync-dot ' + kind;
+  document.getElementById('syncText').textContent = text;
+}
+
+async function loadFromSheet(url){
+  setSyncStatus('', 'A ligar à Google Sheet…');
+  try{
+    const res = await fetch(url, {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const parsed = servicesFromCSV(text);
+    if(parsed.length === 0) throw new Error('Nenhum serviço ativo encontrado na folha.');
+    SERVICES = parsed;
+    lastSync = new Date();
+    setSyncStatus('ok', 'Ligado à Google Sheet · atualizado ' + lastSync.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + ' · ' + parsed.length + ' serviços');
+    state.area = null; state.categoria = null;
+    renderAll();
+    return true;
+  } catch(err){
+    console.error(err);
+    SERVICES = FALLBACK_SERVICES;
+    setSyncStatus('err', 'Não foi possível ligar (' + err.message + ') — a usar cópia local.');
+    state.area = null; state.categoria = null;
+    renderAll();
+    return false;
+  }
+}
+
+function initSync(){
+  const url = SHEET_CSV_URL.trim();
+  if(!url){
+    SERVICES = FALLBACK_SERVICES;
+    setSyncStatus('local', 'A usar cópia local dos serviços (sem ligação configurada).');
+    renderAll();
+    return;
+  }
+  loadFromSheet(url);
+}
+
+document.getElementById('syncRefresh').onclick = () => {
+  const url = document.getElementById('syncUrlInput').value.trim() || SHEET_CSV_URL.trim();
+  if(!url){ setSyncStatus('local', 'Sem ligação configurada — clica em "Ligar a Google Sheet".'); return; }
+  loadFromSheet(url);
+};
+document.getElementById('syncConfig').onclick = () => {
+  const panel = document.getElementById('syncConfigPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+};
+document.getElementById('syncUrlSave').onclick = () => {
+  const url = document.getElementById('syncUrlInput').value.trim();
+  if(!url) return;
+  loadFromSheet(url);
+};
+
+function renderAll(){
+  renderPhases();
+  renderAreaChips();
+  renderCatChips();
+  renderServices();
+  renderBudget();
+}
+
+// --- Wire up static controls ---
+document.querySelectorAll('.toggle button').forEach(btn=>{
+  btn.onclick = () => {
+    state.mode = btn.dataset.mode;
+    document.querySelectorAll('.toggle button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    renderAll();
+  };
+});
+
+document.getElementById('descontoOn').onchange = (e)=>{
+  document.getElementById('descontoPct').disabled = !e.target.checked;
+  renderTotals();
+};
+document.getElementById('ivaOn').onchange = (e)=>{
+  document.getElementById('ivaPct').disabled = !e.target.checked;
+  renderTotals();
+};
+document.getElementById('descontoPct').oninput = renderTotals;
+document.getElementById('ivaPct').oninput = renderTotals;
+
+document.getElementById('clearBtn').onclick = () => {
+  if(state.budget.length && !confirm('Remover todos os serviços do orçamento?')) return;
+  state.budget = [];
+  renderAll();
+};
+
+document.getElementById('exportBtn').onclick = () => {
+  const rows = [['Área','Categoria','Serviço','Quantidade','Preço unitário (€)','Total (€)']];
+  state.budget.forEach(li=>rows.push([li.area, li.categoria, li.servico, li.qty, li.price.toFixed(2), (li.qty*li.price).toFixed(2)]));
+  const subtotal = state.budget.reduce((s,li)=>s + li.qty*li.price, 0);
+  const descOn = document.getElementById('descontoOn').checked;
+  const ivaOn = document.getElementById('ivaOn').checked;
+  const descPct = parseFloat(document.getElementById('descontoPct').value)||0;
+  const ivaPct = parseFloat(document.getElementById('ivaPct').value)||0;
+  const descValor = descOn ? subtotal*(descPct/100) : 0;
+  const baseComDesconto = subtotal - descValor;
+  const ivaValor = ivaOn ? baseComDesconto*(ivaPct/100) : 0;
+  const total = baseComDesconto + ivaValor;
+  rows.push([]);
+  rows.push(['', '', '', '', 'Subtotal', subtotal.toFixed(2)]);
+  if(descOn) rows.push(['', '', '', '', `Desconto (${descPct}%)`, '-'+descValor.toFixed(2)]);
+  if(ivaOn) rows.push(['', '', '', '', `IVA (${ivaPct}%)`, ivaValor.toFixed(2)]);
+  rows.push(['', '', '', '', 'Total', total.toFixed(2)]);
+
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'moonlight_orcamento.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+document.getElementById('quoteBtn').onclick = () => {
+  buildQuoteView();
+  document.body.classList.add('showing-quote');
+  window.scrollTo(0,0);
+};
+document.getElementById('quoteBack').onclick = () => {
+  document.body.classList.remove('showing-quote');
+};
+document.getElementById('quotePdf').onclick = () => {
+  window.print();
+};
+
+function buildQuoteView(){
+  const subtotal = state.budget.reduce((s,li)=>s + li.qty*li.price, 0);
+  const descOn = document.getElementById('descontoOn').checked;
+  const ivaOn = document.getElementById('ivaOn').checked;
+  const descPct = parseFloat(document.getElementById('descontoPct').value) || 0;
+  const ivaPct = parseFloat(document.getElementById('ivaPct').value) || 0;
+  const descValor = descOn ? subtotal * (descPct/100) : 0;
+  const baseComDesconto = subtotal - descValor;
+  const ivaValor = ivaOn ? baseComDesconto * (ivaPct/100) : 0;
+  const total = baseComDesconto + ivaValor;
+
+  const clientName = document.getElementById('clientName').value.trim();
+  const clientProject = document.getElementById('clientProject').value.trim();
+  const validityDays = parseInt(document.getElementById('clientValidity').value) || 15;
+
+  const today = new Date();
+  const untilDate = new Date(today.getTime() + validityDays*24*60*60*1000);
+  const dfmt = (d) => d.toLocaleDateString('pt-PT', {day:'2-digit', month:'2-digit', year:'numeric'});
+
+  document.getElementById('qDate').textContent = dfmt(today);
+  document.getElementById('qValidUntil').textContent = dfmt(untilDate);
+  document.getElementById('qModeMeta').textContent = state.mode === 'premium' ? 'Tabela: Premium' : 'Tabela: Base';
+  document.getElementById('qClientName').textContent = clientName || '—';
+  document.getElementById('qProjectLine').textContent = clientProject ? ('Projeto: ' + clientProject) : '';
+  document.getElementById('qFooterDate').textContent = dfmt(today);
+  document.getElementById('qFooterValidity').textContent = validityDays;
+
+  const body = document.getElementById('quoteBody');
+  body.innerHTML = '';
+  state.budget.forEach(li=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="q-name">${escapeHtml(li.servico)}</div>
+        <div class="q-desc">${escapeHtml(li.area)} · ${escapeHtml(li.categoria)}${li.unidade ? ' · /'+escapeHtml(li.unidade) : ''}</div>
+      </td>
+      <td class="num">${li.qty}</td>
+      <td class="num">${fmt(li.price)}</td>
+      <td class="num">${fmt(li.qty*li.price)}</td>
+    `;
+    body.appendChild(tr);
+  });
+
+  document.getElementById('qSubtotal').textContent = fmt(subtotal);
+
+  const descRow = document.getElementById('qDescRow');
+  if(descOn){
+    descRow.style.display='flex';
+    document.getElementById('qDescLabel').textContent = `Desconto (${descPct}%)`;
+    document.getElementById('qDesc').textContent = '— ' + fmt(descValor);
+  } else { descRow.style.display='none'; }
+
+  const ivaRow = document.getElementById('qIvaRow');
+  if(ivaOn){
+    ivaRow.style.display='flex';
+    document.getElementById('qIvaLabel').textContent = `IVA (${ivaPct}%)`;
+    document.getElementById('qIva').textContent = '+ ' + fmt(ivaValor);
+  } else { ivaRow.style.display='none'; }
+
+  document.getElementById('qTotal').textContent = fmt(total);
+}
+
+initSync();
+</script>
+</body>
+</html>
