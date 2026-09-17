@@ -759,7 +759,7 @@ function parseUnidade(raw){
 }
 
 function servicesFromCSV(text){
-  const delim = detectDelimiter(text.split('\n')[0]);
+  const delim = ',';
   const rows = parseCSV(text, delim);
   if(rows.length < 2) throw new Error('Folha vazia ou sem dados.');
 
