@@ -763,7 +763,15 @@ function servicesFromCSV(text){
   const rows = parseCSV(text, delim);
   if(rows.length < 2) throw new Error('Folha vazia ou sem dados.');
 
-  const header = rows[0].map(norm);
+  const headerRowIndex = rows.findIndex(row =>
+  row.some(cell => norm(cell) === 'servico')
+);
+
+if (headerRowIndex === -1) {
+  throw new Error('Não encontrei a coluna "Serviço" no cabeçalho.');
+}
+
+const header = rows[headerRowIndex].map(norm);
   const col = (names) => {
     for(const name of names){
       const idx = header.findIndex(h => h === norm(name));
@@ -784,7 +792,7 @@ function servicesFromCSV(text){
 
   let lastArea = '', lastCat = '';
   const out = [];
-  for(let r=1; r<rows.length; r++){
+  for(let r=headerRowIndex + 1; r<rows.length; r++){
     const row = rows[r];
     const areaRaw = iArea>=0 ? row[iArea]?.trim() : '';
     const catRaw = iCat>=0 ? row[iCat]?.trim() : '';
